@@ -13,9 +13,10 @@ export async function GetLast3MatchIds() {
   const data = await res.json();
 
   const matchIds =
-    data?.data?.[0]?.relationships?.matches?.data
-      ?.slice(0, 3)
-      .map((match: any) => match.id) || [];
+  data?.data?.[0]?.relationships?.matches?.data
+  ?.slice(0, 3)
+  //@ts-expect-error Reason: data is expected to have a type
+      .map((match) => match.id) || [];
 
   return matchIds
 }

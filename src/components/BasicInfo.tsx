@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface BasicInfoProps {
   tournament: {
@@ -20,7 +21,7 @@ const BasicInfo: React.FC<BasicInfoProps> = ({ tournament }) => {
         <div className="p-6">
           <div className="flex items-center space-x-6">
             <div>
-              <img className='w-[100px]' src="/img/bd71.png" alt="" />
+              <Image className='w-[100px]' width={100} height={100} src="/img/bd71.png" alt="Bd71" />
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between">

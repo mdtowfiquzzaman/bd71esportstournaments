@@ -2,6 +2,35 @@ import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
+interface Participant {
+  id: string;
+  attributes: {
+    stats: {
+      kills?: number;
+      assists?: number;
+      revives?: number;
+      damageDealt?: number;
+      winPlace?: number;
+      timeSurvived?: number;
+      name: string;
+    };
+  };
+}
+
+interface Roster {
+  attributes: {
+    stats: {
+      teamId: string;
+      rank: number;
+    };
+  };
+  relationships: {
+    participants: {
+      data: { id: string }[];
+    };
+  };
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -20,8 +49,8 @@ export async function GET(req: Request) {
 
     const isSolo = tournament?.tournamentType === "Solo";
 
-    const teamStats: Record<string, any> = {};
-    const playerStats: Record<string, any> = {};
+    const teamStats: Record<string, Record<string, number | string>> = {};
+    const playerStats: Record<string, Record<string, number>> = {};
 
     const placePointTable: Record<number, number> = {
       1: 10,
@@ -35,7 +64,8 @@ export async function GET(req: Request) {
     };
 
     const enrichedMatches = await Promise.all(
-      matches.map(async (match) => {
+       //@typescript-eslint/no-explicit-any
+      matches.map(async (match: Record<string, unknown>) => {
         const matchId = match.matchId;
 
         const response = await fetch(`https://api.pubg.com/shards/steam/matches/${matchId}`, {
@@ -46,18 +76,21 @@ export async function GET(req: Request) {
 
         const data = await response.json();
 
-        const participants = data.included.filter((i: any) => i.type === "participant");
-        const rosters = data.included.filter((i: any) => i.type === "roster");
+        //@ts-expect-error Reason: data is expected to have a type
+        const participants = data.included.filter((i) => i.type === "participant") as Participant[];
+        //@ts-expect-error Reason: data is expected to have a type
+        const rosters = data.included.filter((i) => i.type === "roster") as Roster[];
 
         if (!isSolo) {
           for (const roster of rosters) {
             const teamId = roster.attributes.stats.teamId;
             const rank = roster.attributes.stats.rank;
-            const participantIds = roster.relationships.participants.data.map((p: any) => p.id);
+            const participantIds = roster.relationships.participants.data.map((p) => p.id);
 
             if (!teamId) continue;
 
             if (!teamStats[teamId]) {
+              
               const team = teams.find((t) => t.teamGameId === teamId);
               teamStats[teamId] = {
                 teamName: team?.teamName || `Team-${teamId}`,
@@ -76,7 +109,7 @@ export async function GET(req: Request) {
             let kills = 0, assists = 0, revives = 0, damage = 0, deaths = 0;
 
             for (const pid of participantIds) {
-              const p = participants.find((p: any) => p.id === pid);
+              const p = participants.find((p) => p.id === pid);
               if (!p) continue;
 
               const stats = p.attributes.stats;
@@ -111,7 +144,8 @@ export async function GET(req: Request) {
             const placePts = placePointTable[rank] || 0;
             const totalPts = placePts + kills;
 
-            const ts = teamStats[teamId];
+            
+            const ts = teamStats[teamId] as Record<string, number>;
             ts.matchPlayedCount += 1;
             ts.placePoints += placePts;
             ts.kills += kills;
@@ -123,7 +157,8 @@ export async function GET(req: Request) {
             if (rank === 1) ts.totalWins += 1;
           }
 
-          const winnerRoster = rosters.find((r: any) => r.attributes.stats.rank === 1);
+          const winnerRoster = rosters.find((r) => r.attributes.stats.rank === 1);
+
           const winningTeam = teams.find((t) => t.teamGameId === winnerRoster?.attributes.stats.teamId);
           match.winningTeam = {
             teamId: winningTeam?.teamGameId || winnerRoster?.attributes.stats.teamId,
@@ -136,29 +171,30 @@ export async function GET(req: Request) {
     );
 
     const leaderBoardData = Object.entries(teamStats)
-      .map(([teamId, stat]: any) => {
-        const avgPoints = +(stat.totalPoints / stat.matchPlayedCount).toFixed(2);
-        const avgKill = +(stat.kills / stat.matchPlayedCount).toFixed(2);
-        const avgDeath = +(stat.totalDeaths / stat.matchPlayedCount).toFixed(2);
-        const avgDamage = +(stat.damage / stat.matchPlayedCount).toFixed(2);
-        const kd = stat.totalDeaths === 0 ? stat.kills : +(stat.kills / stat.totalDeaths).toFixed(2);
+      .map(([teamId, stat]) => {
+        const s = stat as Record<string, number>;
+        const avgPoints = +(s.totalPoints / s.matchPlayedCount).toFixed(2);
+        const avgKill = +(s.kills / s.matchPlayedCount).toFixed(2);
+        const avgDeath = +(s.totalDeaths / s.matchPlayedCount).toFixed(2);
+        const avgDamage = +(s.damage / s.matchPlayedCount).toFixed(2);
+        const kd = s.totalDeaths === 0 ? s.kills : +(s.kills / s.totalDeaths).toFixed(2);
 
         return {
           teamId,
-          teamName: stat.teamName,
-          matchPlayedCount: stat.matchPlayedCount,
-          placePoints: stat.placePoints,
-          kills: stat.kills,
-          totalPoints: stat.totalPoints,
+          teamName: s.teamName,
+          matchPlayedCount: s.matchPlayedCount,
+          placePoints: s.placePoints,
+          kills: s.kills,
+          totalPoints: s.totalPoints,
           avgPoints,
           avgKill,
-          totalWins: stat.totalWins,
-          totalDeaths: stat.totalDeaths,
+          totalWins: s.totalWins,
+          totalDeaths: s.totalDeaths,
           avgDeath,
           kd,
-          assists: stat.assists,
-          revives: stat.revives,
-          totalDamage: stat.damage,
+          assists: s.assists,
+          revives: s.revives,
+          totalDamage: s.damage,
           avgDamage,
         };
       })
@@ -169,7 +205,7 @@ export async function GET(req: Request) {
       }));
 
     const playerStatsData = Object.entries(playerStats)
-      .map(([playerName, stat]: any) => {
+      .map(([playerName, stat]) => {
         const avgKills = +(stat.kills / stat.matchPlayedCount).toFixed(2);
         const avgDeaths = +(stat.deaths / stat.matchPlayedCount).toFixed(2);
         const avgDamage = +(stat.damage / stat.matchPlayedCount).toFixed(2);

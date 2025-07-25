@@ -1,6 +1,7 @@
 // components/TournamentsCard.tsx
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface TournamentProps {
   id: string;
@@ -31,7 +32,7 @@ const TournamentsCard = ({
   return (
     <div className="tournament-card p-4 border-b border-gray-700">
       <div className="logo mb-2">
-        <img className="w-20 h-20 rounded" src="/img/bd71.png" alt="Tournament Logo" />
+        <Image width={100} height={100} className="w-20 h-20 rounded" src="/img/bd71.png" alt="Tournament Logo" />
       </div>
       <div className="tournament-details mb-2">
         <h2 className="text-xl font-semibold">{tournamentName}</h2>
