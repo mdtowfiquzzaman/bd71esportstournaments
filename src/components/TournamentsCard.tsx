@@ -41,7 +41,7 @@ const TournamentsCard = ({
         <div className="text-sm text-gray-300 space-y-1 flex flex-row gap-4">
           <p>Starting Date: {formatDate(startingDate)}</p>
           <p>Tier: {tier}</p>
-          <p>Prize Pool: ${prize}</p>
+          <p>Prize Pool: ৳ {prize}</p>
           <p>Region: {region}</p>
         </div>
       </div>

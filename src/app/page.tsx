@@ -12,6 +12,7 @@ interface Tournament {
   endDate: string;
   tier: string;
   region: string;
+  tournamentImage: string;
   prize: string;
   totalMatch: number;
 }
@@ -47,6 +48,7 @@ export default function Home() {
             <TournamentsCard
               key={tournament._id}
               id={tournament._id}
+              tournamentImage={tournament.tournamentImage}
               tournamentName={tournament.tournamentName}
               startingDate={tournament.startingDate}
               tier={tournament.tier}

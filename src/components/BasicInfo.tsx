@@ -76,7 +76,7 @@ const BasicInfo: React.FC<BasicInfoProps> = ({ tournament }) => {
                     PRIZE POOL
                   </div>
                   <div className="text-white font-medium">
-                    {tournament.prize}
+                    ৳ {tournament.prize}
                   </div>
                 </div>
                 <div>
