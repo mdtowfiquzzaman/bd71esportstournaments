@@ -8,6 +8,7 @@ interface BasicInfoProps {
     endDate: string;
     tier: string;
     region: string;
+    tournamentImage: string;
     prize: string;
     status: string;
     tournamentType: string; // Added tournamentType
@@ -21,7 +22,7 @@ const BasicInfo: React.FC<BasicInfoProps> = ({ tournament }) => {
         <div className="p-6">
           <div className="flex items-center space-x-6">
             <div>
-              <Image className='w-[100px]' width={100} height={100} src="/img/bd71.png" alt="Bd71" />
+              <Image className='w-[100px]' width={100} height={100} src={tournament.tournamentImage} alt="Bd71" />
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between">
@@ -75,7 +76,7 @@ const BasicInfo: React.FC<BasicInfoProps> = ({ tournament }) => {
                     PRIZE POOL
                   </div>
                   <div className="text-white font-medium">
-                    {tournament.prize}
+                    ৳ {tournament.prize}
                   </div>
                 </div>
                 <div>

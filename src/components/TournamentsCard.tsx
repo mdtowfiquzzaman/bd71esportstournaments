@@ -9,6 +9,7 @@ interface TournamentProps {
   startingDate: string;
   tier: string;
   region: string;
+  tournamentImage: string;
   prize: string;
 }
 
@@ -27,19 +28,20 @@ const TournamentsCard = ({
   startingDate,
   tier,
   region,
+  tournamentImage,
   prize
 }: TournamentProps) => {
   return (
     <div className="tournament-card p-4 border-b border-gray-700">
       <div className="logo mb-2">
-        <Image width={100} height={100} className="w-20 h-20 rounded" src="/img/bd71.png" alt="Tournament Logo" />
+        <Image width={100} height={100} className="w-20 h-20 rounded" src={tournamentImage} alt="Tournament Logo" />
       </div>
       <div className="tournament-details mb-2">
         <h2 className="text-xl font-semibold">{tournamentName}</h2>
         <div className="text-sm text-gray-300 space-y-1 flex flex-row gap-4">
           <p>Starting Date: {formatDate(startingDate)}</p>
           <p>Tier: {tier}</p>
-          <p>Prize Pool: ${prize}</p>
+          <p>Prize Pool: ৳ {prize}</p>
           <p>Region: {region}</p>
         </div>
       </div>
