@@ -12,10 +12,10 @@ const Header = () => {
                 </Link>
             </div>
             <nav className="space-x-4">
-                <Link href="/" className="hover:underline">Home</Link>
-                <Link href="/tournaments" className="hover:underline">Tournaments</Link>
+                <Link href="/" className="hover:underline">Tournaments</Link>
                 <Link href="/about" className="hover:underline">About Us</Link>
                 <Link href="/contact" className="hover:underline">Contact</Link>
+                <Link href="/lives" className="px-6 py-3 bg-amber-700 no-underline hover:bg-amber-600 rounded-4xl">Watch Live</Link>
             </nav>
         </div>
     )
