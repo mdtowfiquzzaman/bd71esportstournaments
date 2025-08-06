@@ -16,7 +16,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ data }) => {
                 <div key={team._id} className="flex flex-col gap-2 p-4 bg-[#24272c] text-white rounded-xl">
                     <div className='flex flex-row gap-2 items-center'>
                         <div className='w-20 h-20 bg-amber-900 rounded-full flex justify-center items-center text-3xl'>#{team.teamGameId}</div>
-                        <div className='text-3xl font-bold overflow-ellipsis'>{team.teamName}</div>
+                        <div className='text-2xl font-bold overflow-ellipsis'>{team.teamName}</div>
                     </div>
                     <div className='w-full flex flex-col gap-2 p-4 bg-[#24272c] text-white rounded-xl'>
                         {
