@@ -31,6 +31,46 @@ interface Roster {
   };
 }
 
+function getPlacePoints(tournamentType: string, rank: number): number {
+  if (tournamentType === "Solo") {
+    if (rank === 1) return 20;
+    if (rank === 2) return 15;
+    if (rank >= 3 && rank <= 5) return 12;
+    if (rank >= 6 && rank <= 10) return 10;
+    if (rank >= 11 && rank <= 20) return 8;
+    if (rank >= 21 && rank <= 30) return 5;
+    if (rank >= 31 && rank <= 40) return 3;
+    if (rank >= 41 && rank <= 50) return 2;
+    if (rank >= 51 && rank <= 100) return 1;
+    return 0;
+  }
+
+  if (tournamentType === "Duo") {
+    if (rank === 1) return 10;
+    if (rank === 2) return 6;
+    if (rank === 3 || rank === 4) return 5;
+    if (rank === 5 || rank === 6) return 4;
+    if (rank === 7 || rank === 8) return 3;
+    if (rank === 9 || rank === 10) return 2;
+    if (rank === 11 || rank === 12) return 1;
+    return 0;
+  }
+
+  // Squad (default)
+  if (rank === 1) return 10;
+  if (rank === 2) return 6;
+  if (rank === 3) return 5;
+  if (rank === 4) return 4;
+  if (rank === 5) return 3;
+  if (rank === 6) return 2;
+  if (rank === 7 || rank === 8) return 1;
+  return 0;
+}
+
+function getKillPointValue(): number {
+  return 1; // Can customize later
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -47,24 +87,18 @@ export async function GET(req: Request) {
     const teams = await db.collection("teams").find({ tournamentId }).toArray();
     const tournament = await db.collection("tournaments").findOne({ _id: new ObjectId(tournamentId) });
 
-    const isSolo = tournament?.tournamentType === "Solo";
+    if (!tournament) {
+      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+    }
+
+    const tournamentType = tournament.tournamentType;
+    const isSolo = tournamentType === "Solo";
+    const isDuo = tournamentType === "Duo";
 
     const teamStats: Record<string, Record<string, number | string>> = {};
     const playerStats: Record<string, Record<string, number>> = {};
 
-    const placePointTable: Record<number, number> = {
-      1: 10,
-      2: 6,
-      3: 5,
-      4: 4,
-      5: 3,
-      6: 2,
-      7: 1,
-      8: 1,
-    };
-
     const enrichedMatches = await Promise.all(
-       //@typescript-eslint/no-explicit-any
       matches.map(async (match: Record<string, unknown>) => {
         const matchId = match.matchId;
 
@@ -76,9 +110,9 @@ export async function GET(req: Request) {
 
         const data = await response.json();
 
-        //@ts-expect-error Reason: data is expected to have a type
+        //@ts-expect-error
         const participants = data.included.filter((i) => i.type === "participant") as Participant[];
-        //@ts-expect-error Reason: data is expected to have a type
+        //@ts-expect-error
         const rosters = data.included.filter((i) => i.type === "roster") as Roster[];
 
         if (!isSolo) {
@@ -90,7 +124,6 @@ export async function GET(req: Request) {
             if (!teamId) continue;
 
             if (!teamStats[teamId]) {
-              
               const team = teams.find((t) => t.teamGameId === teamId);
               teamStats[teamId] = {
                 teamName: team?.teamName || `Team-${teamId}`,
@@ -106,7 +139,11 @@ export async function GET(req: Request) {
               };
             }
 
-            let kills = 0, assists = 0, revives = 0, damage = 0, deaths = 0;
+            let kills = 0,
+              assists = 0,
+              revives = 0,
+              damage = 0,
+              deaths = 0;
 
             for (const pid of participantIds) {
               const p = participants.find((p) => p.id === pid);
@@ -129,6 +166,7 @@ export async function GET(req: Request) {
                   deaths: 0,
                   survivalTime: 0,
                   matchPlayedCount: 0,
+                  totalTeamWins: 0, // <-- Added for TWR count
                 };
               }
 
@@ -141,10 +179,10 @@ export async function GET(req: Request) {
               playerStats[name].matchPlayedCount += 1;
             }
 
-            const placePts = placePointTable[rank] || 0;
-            const totalPts = placePts + kills;
+            const placePts = getPlacePoints(tournamentType, rank);
+            const killPts = kills * getKillPointValue();
+            const totalPts = placePts + killPts;
 
-            
             const ts = teamStats[teamId] as Record<string, number>;
             ts.matchPlayedCount += 1;
             ts.placePoints += placePts;
@@ -154,11 +192,19 @@ export async function GET(req: Request) {
             ts.damage += damage;
             ts.totalDeaths += deaths;
             ts.totalPoints += totalPts;
-            if (rank === 1) ts.totalWins += 1;
+            if (rank === 1) {
+              ts.totalWins += 1;
+              // Add total wins count to each participant in this team for TWR calculation
+              for (const pid of participantIds) {
+                const p = participants.find((p) => p.id === pid);
+                if (!p) continue;
+                const name = p.attributes.stats.name;
+                playerStats[name].totalTeamWins += 1;
+              }
+            }
           }
 
           const winnerRoster = rosters.find((r) => r.attributes.stats.rank === 1);
-
           const winningTeam = teams.find((t) => t.teamGameId === winnerRoster?.attributes.stats.teamId);
           match.winningTeam = {
             teamId: winningTeam?.teamGameId || winnerRoster?.attributes.stats.teamId,
@@ -226,6 +272,7 @@ export async function GET(req: Request) {
           avgDamage,
           totalSurvivalTime: +stat.survivalTime.toFixed(2),
           avgSurvivalTime: avgSurvival,
+           // <-- Add TWR percentage here
         };
       })
       .sort((a, b) => b.kd - a.kd)
