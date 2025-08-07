@@ -84,7 +84,14 @@ export async function GET(req: Request) {
     const db = client.db("bd71");
 
     const matches = await db.collection("matches").find({ tournamentId }).toArray();
-    const teams = await db.collection("teams").find({ tournamentId }).toArray();
+    const gettingTeams = await db.collection("teams").find({ tournamentId }).toArray();
+    const teams = gettingTeams.sort((a, b) => Number(a.teamGameId) - Number(b.teamGameId));
+
+    const teamGameIdToNameMap = teams.reduce((acc, team) => {
+      acc[team.teamGameId] = team.teamName;
+      return acc;
+    }, {} as Record<string, string>);
+
     const tournament = await db.collection("tournaments").findOne({ _id: new ObjectId(tournamentId) });
 
     if (!tournament) {
@@ -93,13 +100,12 @@ export async function GET(req: Request) {
 
     const tournamentType = tournament.tournamentType;
     const isSolo = tournamentType === "Solo";
-    const isDuo = tournamentType === "Duo";
 
     const teamStats: Record<string, Record<string, number | string>> = {};
     const playerStats: Record<string, Record<string, number>> = {};
 
     const enrichedMatches = await Promise.all(
-      matches.map(async (match: Record<string, unknown>) => {
+      matches.map(async (match: Record<string, any>) => {
         const matchId = match.matchId;
 
         const response = await fetch(`https://api.pubg.com/shards/steam/matches/${matchId}`, {
@@ -110,10 +116,8 @@ export async function GET(req: Request) {
 
         const data = await response.json();
 
-        //@ts-expect-error
-        const participants = data.included.filter((i) => i.type === "participant") as Participant[];
-        //@ts-expect-error
-        const rosters = data.included.filter((i) => i.type === "roster") as Roster[];
+        const participants = data.included.filter((i: any) => i.type === "participant") as Participant[];
+        const rosters = data.included.filter((i: any) => i.type === "roster") as Roster[];
 
         if (!isSolo) {
           for (const roster of rosters) {
@@ -124,9 +128,8 @@ export async function GET(req: Request) {
             if (!teamId) continue;
 
             if (!teamStats[teamId]) {
-              const team = teams.find((t) => t.teamGameId === teamId);
               teamStats[teamId] = {
-                teamName: team?.teamName || `Team-${teamId}`,
+                teamName: teamGameIdToNameMap[teamId] || `Team-${teamId}`,
                 matchPlayedCount: 0,
                 placePoints: 0,
                 kills: 0,
@@ -139,11 +142,7 @@ export async function GET(req: Request) {
               };
             }
 
-            let kills = 0,
-              assists = 0,
-              revives = 0,
-              damage = 0,
-              deaths = 0;
+            let kills = 0, assists = 0, revives = 0, damage = 0, deaths = 0;
 
             for (const pid of participantIds) {
               const p = participants.find((p) => p.id === pid);
@@ -166,7 +165,7 @@ export async function GET(req: Request) {
                   deaths: 0,
                   survivalTime: 0,
                   matchPlayedCount: 0,
-                  totalTeamWins: 0, // <-- Added for TWR count
+                  totalTeamWins: 0,
                 };
               }
 
@@ -192,9 +191,9 @@ export async function GET(req: Request) {
             ts.damage += damage;
             ts.totalDeaths += deaths;
             ts.totalPoints += totalPts;
+
             if (rank === 1) {
               ts.totalWins += 1;
-              // Add total wins count to each participant in this team for TWR calculation
               for (const pid of participantIds) {
                 const p = participants.find((p) => p.id === pid);
                 if (!p) continue;
@@ -205,10 +204,10 @@ export async function GET(req: Request) {
           }
 
           const winnerRoster = rosters.find((r) => r.attributes.stats.rank === 1);
-          const winningTeam = teams.find((t) => t.teamGameId === winnerRoster?.attributes.stats.teamId);
+          const winnerId = winnerRoster?.attributes.stats.teamId || "";
           match.winningTeam = {
-            teamId: winningTeam?.teamGameId || winnerRoster?.attributes.stats.teamId,
-            teamName: winningTeam?.teamName || `Team-${winnerRoster?.attributes.stats.teamId}`,
+            teamId: winnerId,
+            teamName: teamGameIdToNameMap[winnerId] || `Team-${winnerId}`,
           };
         }
 
@@ -227,7 +226,7 @@ export async function GET(req: Request) {
 
         return {
           teamId,
-          teamName: s.teamName,
+          teamName: teamGameIdToNameMap[teamId] || stat.teamName || `Team-${teamId}`,
           matchPlayedCount: s.matchPlayedCount,
           placePoints: s.placePoints,
           kills: s.kills,
@@ -272,7 +271,6 @@ export async function GET(req: Request) {
           avgDamage,
           totalSurvivalTime: +stat.survivalTime.toFixed(2),
           avgSurvivalTime: avgSurvival,
-           // <-- Add TWR percentage here
         };
       })
       .sort((a, b) => b.kd - a.kd)
